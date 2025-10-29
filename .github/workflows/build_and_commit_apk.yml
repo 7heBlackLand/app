@@ -36,22 +36,43 @@ jobs:
             libtinfo5 \
             python3-pip
 
+      - name: Cache Buildozer and Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            ~/.gradle
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: |
+            buildozer-${{ runner.os }}-
+
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install Cython buildozer kivy
+          pip install buildozer Cython kivy virtualenv
+
+      - name: Prepare Buildozer environment
+        run: |
+          mkdir -p ~/.buildozer
+          python -m venv ~/.buildozer/venv
+          source ~/.buildozer/venv/bin/activate
+          pip install --upgrade pip
+          pip install buildozer Cython kivy
 
       - name: Verify environment
         run: |
-          echo "Current working directory: $(pwd)"
-          echo "Files in repo:"
-          ls -R
+          source ~/.buildozer/venv/bin/activate
+          echo "Python version:"
+          python --version
+          echo "Installed packages:"
+          pip list
           echo "===== buildozer.spec content ====="
           cat buildozer.spec || echo "buildozer.spec NOT FOUND!"
           echo "=================================="
 
       - name: Build APK
         run: |
+          source ~/.buildozer/venv/bin/activate
           buildozer android debug
 
       - name: List built files
