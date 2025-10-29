@@ -58,6 +58,15 @@ jobs:
           pip install --upgrade pip
           pip install buildozer Cython kivy
 
+      - name: Accept Android SDK Licenses
+        run: |
+          source ~/.buildozer/venv/bin/activate
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          yes | sdkmanager --licenses || true
+          yes | sdkmanager --update || true
+          yes | sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;36.1.0"
+
       - name: Verify environment
         run: |
           source ~/.buildozer/venv/bin/activate
@@ -72,6 +81,8 @@ jobs:
       - name: Build APK
         run: |
           source ~/.buildozer/venv/bin/activate
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
           buildozer android debug
 
       - name: List built files
