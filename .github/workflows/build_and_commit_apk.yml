@@ -1,40 +1,47 @@
-name: Build and Commit Android APK
+name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  build-apk:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: false
+        uses: actions/checkout@v4
 
-      # Step 2: Setup Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: '3.10'
 
-      # Step 3: Install dependencies
-      - name: Install dependencies
+      - name: Install system dependencies
         run: |
-          sudo apt update
-          sudo apt install -y openjdk-17-jdk git zip unzip
-          pip install --upgrade pip
-          pip install buildozer
+          sudo apt-get update
+          sudo apt-get install -y \
+            openjdk-17-jdk \
+            zip \
+            unzip \
+            libffi-dev \
+            libssl-dev \
+            git \
+            pkg-config \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libncurses5 \
+            libtinfo5 \
+            python3-pip
 
-      # 🔍 Step 4: Debug — show current directory & spec file
-      - name: Debug buildozer.spec
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install Cython buildozer kivy
+
+      - name: Verify environment
         run: |
           echo "Current working directory: $(pwd)"
           echo "Files in repo:"
@@ -43,37 +50,19 @@ jobs:
           cat buildozer.spec || echo "buildozer.spec NOT FOUND!"
           echo "=================================="
 
-      # Step 5: Build APK
       - name: Build APK
         run: |
           buildozer android debug
 
-      # Step 6: Move APK to output folder
-      - name: Move APK
+      - name: List built files
         run: |
-          mkdir -p output
-          cp bin/*.apk output/
+          echo "===== bin directory ====="
+          ls -lh bin || echo "bin/ directory not found!"
+          echo "=========================="
 
-      # Step 7: Commit and push APK
-      - name: Commit and push APK
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add output/*.apk
-
-          if git diff --cached --quiet; then
-            echo "No new APK to commit"
-          else
-            git commit -m "Auto-built APK at $(date +'%Y-%m-%d %H:%M:%S')"
-            git push https://x-access-token:${PAT_TOKEN}@github.com/${{ github.repository }}.git main
-          fi
-
-      # Step 8: Upload APK as artifact (optional)
-      - name: Upload APK artifact
+      - name: Upload built APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: kivy-hello-apk
-          path: output/*.apk
+          name: built-apk
+          path: bin/*.apk
