@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: কোড চেকআউট করো
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Python সেটআপ করো
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install system dependencies
+      - name: প্রয়োজনীয় সিস্টেম ডিপেনডেন্সি ইনস্টল করো
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -35,22 +35,12 @@ jobs:
             libncurses6 \
             python3-pip
 
-      - name: Cache Buildozer and Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.buildozer
-            ~/.gradle
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-${{ runner.os }}-
-
-      - name: Install Python dependencies
+      - name: Python প্যাকেজ ইনস্টল করো
         run: |
           python -m pip install --upgrade pip
           pip install buildozer Cython kivy virtualenv
 
-      - name: Prepare Buildozer environment
+      - name: Buildozer এনভায়রনমেন্ট তৈরি করো
         run: |
           mkdir -p ~/.buildozer
           python -m venv ~/.buildozer/venv
@@ -58,65 +48,51 @@ jobs:
           pip install --upgrade pip
           pip install buildozer Cython kivy
 
-      - name: Buildozer first run (setup SDK folders)
+      - name: Buildozer প্রাথমিক রান (SDK ফোল্ডার তৈরি)
         run: |
           source ~/.buildozer/venv/bin/activate
           buildozer android clean || true
         continue-on-error: true
 
-      - name: Accept SDK Licenses inside Buildozer SDK
+      - name: Android Commandline Tools ইনস্টল করো
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools/latest
-          if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/bin" ]; then
-            export PATH=$ANDROID_SDK_ROOT/cmdline-tools/bin:$PATH
-          elif [ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" ]; then
-            export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          fi
-          echo "Accepting SDK licenses inside Buildozer SDK..."
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses || true
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --update || true
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.1.0"
+          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
+          cd $ANDROID_SDK_ROOT/cmdline-tools
+          echo "Downloading latest commandline-tools..."
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip -qo cmdline-tools.zip
+          rm cmdline-tools.zip
+          mv cmdline-tools latest || mv cmdline-tools latest || true
+          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT --version
 
-      - name: Verify environment
+      - name: SDK লাইসেন্স অ্যাকসেপ্ট ও Build-tools ইনস্টল করো
         run: |
           source ~/.buildozer/venv/bin/activate
-          echo "Python version:"
-          python --version
-          echo "Installed packages:"
-          pip list
-          echo "===== buildozer.spec ====="
-          cat buildozer.spec || echo "buildozer.spec NOT FOUND!"
-          echo "=========================="
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
+          echo "লাইসেন্স অ্যাকসেপ্ট করা হচ্ছে..."
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --update
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.1.0"
 
-      - name: Build APK
+      - name: SDK ফোল্ডার যাচাই করো
+        run: |
+          echo "SDK Path: $HOME/.buildozer/android/platform/android-sdk"
+          ls -R $HOME/.buildozer/android/platform/android-sdk/build-tools || echo "build-tools missing!"
+
+      - name: APK বিল্ড করো
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
           buildozer android debug
 
-      - name: List built files
-        run: |
-          echo "===== bin directory ====="
-          ls -lh bin || echo "bin/ directory not found!"
-          echo "=========================="
-
-      - name: Upload built APK
+      - name: APK আপলোড করো
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: built-apk
           path: bin/*.apk
-
-      - name: Commit built APK to repository
-        if: success()
-        run: |
-          mkdir -p output_apk
-          cp bin/*.apk output_apk/ || echo "No APK found"
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add output_apk/ || true
-          git diff --quiet && echo "No changes to commit" || git commit -m "Add latest built APK"
-          git push
