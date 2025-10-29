@@ -11,17 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 🧩 Step 1: Checkout code
+      # 1️⃣ Checkout your repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🐍 Step 2: Set up Python
+      # 2️⃣ Set up Python 3.10
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # ⚙️ Step 3: Install system dependencies (Ubuntu 24.04 compatible)
+      # 3️⃣ Install system dependencies (Ubuntu 24.04 compatible)
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -38,7 +38,7 @@ jobs:
             libncurses6 \
             python3-pip
 
-      # ⚡ Step 4: Cache Buildozer and Gradle to speed up builds
+      # 4️⃣ Cache build directories for faster builds
       - name: Cache Buildozer and Gradle
         uses: actions/cache@v4
         with:
@@ -49,13 +49,13 @@ jobs:
           restore-keys: |
             buildozer-${{ runner.os }}-
 
-      # 🧰 Step 5: Install Python dependencies globally
+      # 5️⃣ Install global Python tools
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install buildozer Cython kivy virtualenv
 
-      # 🧱 Step 6: Prepare Buildozer virtual environment
+      # 6️⃣ Prepare Buildozer environment
       - name: Prepare Buildozer environment
         run: |
           mkdir -p ~/.buildozer
@@ -64,7 +64,7 @@ jobs:
           pip install --upgrade pip
           pip install buildozer Cython kivy
 
-      # 🔍 Step 7: Verify setup
+      # 7️⃣ Show debug info
       - name: Verify environment
         run: |
           source ~/.buildozer/venv/bin/activate
@@ -76,20 +76,20 @@ jobs:
           cat buildozer.spec || echo "buildozer.spec NOT FOUND!"
           echo "=========================="
 
-      # 🏗️ Step 8: Build the APK
+      # 8️⃣ Build the APK
       - name: Build APK
         run: |
           source ~/.buildozer/venv/bin/activate
           buildozer android debug
 
-      # 📦 Step 9: List build output
+      # 9️⃣ Show output directory
       - name: List built files
         run: |
           echo "===== bin directory ====="
           ls -lh bin || echo "bin/ directory not found!"
           echo "=========================="
 
-      # ☁️ Step 10: Upload APK as artifact
+      # 🔟 Upload built APK as artifact
       - name: Upload built APK
         if: success()
         uses: actions/upload-artifact@v4
@@ -97,7 +97,7 @@ jobs:
           name: built-apk
           path: bin/*.apk
 
-      # 💾 Step 11: Commit built APK back to repo
+      # 1️⃣1️⃣ Commit built APK to repo (optional)
       - name: Commit built APK to repository
         if: success()
         run: |
