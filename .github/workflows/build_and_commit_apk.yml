@@ -1,9 +1,8 @@
-name: Build Android APK (Kivy/KivyMD)
+name: Build Android APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -11,117 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # -----------------------------
-      # 🧭 Step 1: Checkout repository
-      # -----------------------------
-      - name: 🧭 Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------
-      # 🐍 Step 2: Setup Python
-      # -----------------------------
-      - name: 🐍 Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
-      # -----------------------------------
-      # ⚙️ Step 3: Install system libraries
-      # -----------------------------------
-      - name: ⚙️ Install system dependencies
+      - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            openjdk-17-jdk zip unzip git \
-            libffi-dev libssl-dev pkg-config \
-            libgl1-mesa-dev libgles2-mesa-dev \
-            python3-pip
+          sudo apt update
+          sudo apt install -y git zip unzip openjdk-17-jdk python3-pip
+          pip install buildozer cython
 
-      # ---------------------------------------
-      # 📦 Step 4: Install Buildozer and p4a
-      # ---------------------------------------
-      - name: 📦 Install Buildozer and dependencies
+      - name: Build APK
         run: |
-          python -m pip install --upgrade pip
-          pip install buildozer Cython kivy kivymd plyer requests python-for-android
-
-      # ---------------------------------------------
-      # 🧱 Step 5: Setup isolated Buildozer environment
-      # ---------------------------------------------
-      - name: 🧱 Setup Buildozer environment
-        run: |
-          mkdir -p ~/.buildozer
-          python -m venv ~/.buildozer/venv
-          source ~/.buildozer/venv/bin/activate
-          pip install --upgrade pip
-          pip install buildozer Cython kivy kivymd plyer requests python-for-android
-
-      # -----------------------------------------------------
-      # 📁 Step 6: Install Android SDK + Fix legacy path issue
-      # -----------------------------------------------------
-      - name: 📁 Install Android SDK and fix sdkmanager path
-        run: |
-          source ~/.buildozer/venv/bin/activate
-          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
-          mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
-          cd $ANDROID_SDK_ROOT/cmdline-tools
-
-          echo "📦 Downloading Android commandline tools..."
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
-          unzip -qo tools.zip
-          rm tools.zip
-          mv cmdline-tools latest || true
-
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-
-          echo "✅ Accepting SDK licenses and installing packages..."
-          yes | sdkmanager --licenses
-          yes | sdkmanager --install "platform-tools" "platforms;android-33" "build-tools;36.0.0"
-
-          # 🧩 Fix: Create legacy path (needed for Buildozer compatibility)
-          mkdir -p $ANDROID_SDK_ROOT/tools/bin
-          ln -sf $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager $ANDROID_SDK_ROOT/tools/bin/sdkmanager
-          echo "✅ Legacy sdkmanager path created."
-
-      # -------------------------------------------
-      # 🧹 Step 7: Clean previous .buildozer folders
-      # -------------------------------------------
-      - name: 🧹 Clean previous builds
-        run: |
-          rm -rf .buildozer
-          source ~/.buildozer/venv/bin/activate
-          buildozer init || true
-
-      # -------------------------------------------
-      # 🧩 Step 8: Clone python-for-android manually
-      # -------------------------------------------
-      - name: 🧩 Prepare python-for-android
-        run: |
-          source ~/.buildozer/venv/bin/activate
-          mkdir -p .buildozer/android/platform
-          cd .buildozer/android/platform
-          if [ ! -d "python-for-android" ]; then
-            echo "🐍 Cloning python-for-android..."
-            git clone https://github.com/kivy/python-for-android.git
-          fi
-
-      # -----------------------------------
-      # 🚀 Step 9: Build the APK (debug mode)
-      # -----------------------------------
-      - name: 🚀 Build APK
-        run: |
-          source ~/.buildozer/venv/bin/activate
-          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          echo "🏗️ Building your APK..."
-          buildozer android debug
-
-      # -------------------------------------
-      # 📤 Step 10: Upload built APK artifact
-      # -------------------------------------
-      - name: 📤 Upload built APK
-        if: success()
+          buildozer -v android debug
+          
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kivy-android-apk
+          name: MyApp-APK
           path: bin/*.apk
