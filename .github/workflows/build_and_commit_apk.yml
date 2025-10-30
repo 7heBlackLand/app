@@ -48,14 +48,16 @@ jobs:
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
           cd $ANDROID_SDK_ROOT/cmdline-tools
-          echo "Downloading Android Commandline Tools..."
+          echo "📦 Downloading Android Commandline Tools..."
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
           unzip -qo tools.zip
           rm tools.zip
           mv cmdline-tools latest || mv cmdline-tools latest || true
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
+          echo "📝 Accepting SDK licenses..."
           yes | sdkmanager --licenses
-          sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.0.0"
+          echo "📥 Installing platform-tools, platforms, build-tools..."
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.0.0"
 
       - name: 🧹 পুরনো বিল্ড ফোল্ডার মুছে ফেলো
         run: |
@@ -69,17 +71,28 @@ jobs:
           mkdir -p .buildozer/android/platform
           cd .buildozer/android/platform
           if [ ! -d "python-for-android" ]; then
-            echo "Downloading python-for-android..."
+            echo "🐍 Downloading python-for-android..."
             git clone https://github.com/kivy/python-for-android.git
           else
-            echo "python-for-android already exists"
+            echo "✅ python-for-android already exists"
           fi
+
+      - name: 🧩 Fix SDKManager path (Buildozer compatibility)
+        run: |
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+          if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ] && [ ! -d "$ANDROID_SDK_ROOT/tools" ]; then
+            echo "🔗 Creating symlink for legacy SDK tools..."
+            ln -s "$ANDROID_SDK_ROOT/cmdline-tools/latest" "$ANDROID_SDK_ROOT/tools"
+          fi
+          echo "📂 Current SDK structure:"
+          ls -l $ANDROID_SDK_ROOT
 
       - name: 🚀 APK বিল্ড করো
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+          echo "🏗️ Starting Buildozer build..."
           buildozer android debug
 
       - name: 📤 APK আপলোড করো
