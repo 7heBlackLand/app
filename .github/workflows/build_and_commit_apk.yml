@@ -11,86 +11,78 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: কোড চেকআউট করো
+      - name: 🧭 কোড চেকআউট করো
         uses: actions/checkout@v4
 
-      - name: Python সেটআপ করো
+      - name: 🐍 Python সেটআপ করো
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: প্রয়োজনীয় সিস্টেম ডিপেনডেন্সি ইনস্টল করো
+      - name: ⚙️ সিস্টেম ডিপেনডেন্সি ইনস্টল করো
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             openjdk-17-jdk \
-            zip \
-            unzip \
-            libffi-dev \
-            libssl-dev \
-            git \
-            pkg-config \
-            libgl1-mesa-dev \
-            libgles2-mesa-dev \
-            libncurses6 \
-            python3-pip
+            zip unzip git \
+            libffi-dev libssl-dev \
+            libgl1-mesa-dev libgles2-mesa-dev \
+            pkg-config python3-pip
 
-      - name: Python প্যাকেজ ইনস্টল করো
+      - name: 📦 Python প্যাকেজ ইনস্টল করো
         run: |
           python -m pip install --upgrade pip
-          pip install buildozer Cython kivy virtualenv
+          pip install buildozer Cython kivy virtualenv python-for-android
 
-      - name: Buildozer এনভায়রনমেন্ট তৈরি করো
+      - name: 🏗️ Buildozer এনভায়রনমেন্ট তৈরি করো
         run: |
           mkdir -p ~/.buildozer
           python -m venv ~/.buildozer/venv
           source ~/.buildozer/venv/bin/activate
           pip install --upgrade pip
-          pip install buildozer Cython kivy
+          pip install buildozer Cython kivy python-for-android
 
-      - name: Buildozer প্রাথমিক রান (SDK ফোল্ডার তৈরি)
-        run: |
-          source ~/.buildozer/venv/bin/activate
-          buildozer android clean || true
-        continue-on-error: true
-
-      - name: Android Commandline Tools ইনস্টল করো
+      - name: 📁 Android SDK + Commandline Tools ইনস্টল করো
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
           cd $ANDROID_SDK_ROOT/cmdline-tools
-          echo "Downloading latest commandline-tools..."
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip -qo cmdline-tools.zip
-          rm cmdline-tools.zip
+          echo "Downloading Android Commandline Tools..."
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+          unzip -qo tools.zip
+          rm tools.zip
           mv cmdline-tools latest || mv cmdline-tools latest || true
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          sdkmanager --sdk_root=$ANDROID_SDK_ROOT --version
+          yes | sdkmanager --licenses
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.0.0"
 
-      - name: SDK লাইসেন্স অ্যাকসেপ্ট ও Build-tools ইনস্টল করো
+      - name: 🧹 পুরনো বিল্ড ফোল্ডার মুছে ফেলো
+        run: |
+          rm -rf .buildozer
+          source ~/.buildozer/venv/bin/activate
+          buildozer init || true
+
+      - name: 🧱 Python-for-Android ডাউনলোড ও যাচাই করো
         run: |
           source ~/.buildozer/venv/bin/activate
-          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
-          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          echo "লাইসেন্স অ্যাকসেপ্ট করা হচ্ছে..."
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --update
-          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.1.0"
+          mkdir -p .buildozer/android/platform
+          cd .buildozer/android/platform
+          if [ ! -d "python-for-android" ]; then
+            echo "Downloading python-for-android..."
+            git clone https://github.com/kivy/python-for-android.git
+          else
+            echo "python-for-android already exists"
+          fi
 
-      - name: SDK ফোল্ডার যাচাই করো
-        run: |
-          echo "SDK Path: $HOME/.buildozer/android/platform/android-sdk"
-          ls -R $HOME/.buildozer/android/platform/android-sdk/build-tools || echo "build-tools missing!"
-
-      - name: APK বিল্ড করো
+      - name: 🚀 APK বিল্ড করো
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
           buildozer android debug
 
-      - name: APK আপলোড করো
+      - name: 📤 APK আপলোড করো
         if: success()
         uses: actions/upload-artifact@v4
         with:
