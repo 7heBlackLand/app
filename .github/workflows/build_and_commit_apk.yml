@@ -1,9 +1,8 @@
-name: Build and Commit Android APK
+name: Build Android APK with Buildozer
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -11,30 +10,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 🧭 কোড চেকআউট করো
+      - name: 🧭 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 🐍 Python সেটআপ করো
+      - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: ⚙️ সিস্টেম ডিপেনডেন্সি ইনস্টল করো
+      - name: ⚙️ Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            openjdk-17-jdk \
-            zip unzip git \
+            openjdk-17-jdk zip unzip git \
             libffi-dev libssl-dev \
             libgl1-mesa-dev libgles2-mesa-dev \
             pkg-config python3-pip
 
-      - name: 📦 Python প্যাকেজ ইনস্টল করো
+      - name: 📦 Install Buildozer & dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install buildozer Cython kivy virtualenv python-for-android
+          pip install buildozer Cython kivy python-for-android
 
-      - name: 🏗️ Buildozer এনভায়রনমেন্ট তৈরি করো
+      - name: 🏗️ Setup Buildozer virtual environment
         run: |
           mkdir -p ~/.buildozer
           python -m venv ~/.buildozer/venv
@@ -42,62 +40,58 @@ jobs:
           pip install --upgrade pip
           pip install buildozer Cython kivy python-for-android
 
-      - name: 📁 Android SDK + Commandline Tools ইনস্টল করো
+      - name: 📁 Install Android SDK & commandline tools
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           mkdir -p $ANDROID_SDK_ROOT/cmdline-tools
           cd $ANDROID_SDK_ROOT/cmdline-tools
-          echo "📦 Downloading Android Commandline Tools..."
+          echo "📦 Downloading Android commandline tools..."
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
           unzip -qo tools.zip
           rm tools.zip
-          mv cmdline-tools latest || mv cmdline-tools latest || true
+          mv cmdline-tools latest || true
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
-          echo "📝 Accepting SDK licenses..."
           yes | sdkmanager --licenses
-          echo "📥 Installing platform-tools, platforms, build-tools..."
           yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --install "platform-tools" "platforms;android-33" "build-tools;36.0.0"
 
-      - name: 🧹 পুরনো বিল্ড ফোল্ডার মুছে ফেলো
+      - name: 🧩 Fix sdkmanager path for Buildozer compatibility
+        run: |
+          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+          if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ] && [ ! -d "$ANDROID_SDK_ROOT/tools" ]; then
+            echo "🔗 Creating symlink for Buildozer legacy path..."
+            ln -s "$ANDROID_SDK_ROOT/cmdline-tools/latest" "$ANDROID_SDK_ROOT/tools"
+          fi
+          echo "✅ SDK Path fixed:"
+          ls -l $ANDROID_SDK_ROOT
+
+      - name: 🧹 Clean old build files
         run: |
           rm -rf .buildozer
           source ~/.buildozer/venv/bin/activate
           buildozer init || true
 
-      - name: 🧱 Python-for-Android ডাউনলোড ও যাচাই করো
+      - name: 🧱 Prepare python-for-android
         run: |
           source ~/.buildozer/venv/bin/activate
           mkdir -p .buildozer/android/platform
           cd .buildozer/android/platform
           if [ ! -d "python-for-android" ]; then
-            echo "🐍 Downloading python-for-android..."
+            echo "🐍 Cloning python-for-android..."
             git clone https://github.com/kivy/python-for-android.git
-          else
-            echo "✅ python-for-android already exists"
           fi
 
-      - name: 🧩 Fix SDKManager path (Buildozer compatibility)
-        run: |
-          export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
-          if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ] && [ ! -d "$ANDROID_SDK_ROOT/tools" ]; then
-            echo "🔗 Creating symlink for legacy SDK tools..."
-            ln -s "$ANDROID_SDK_ROOT/cmdline-tools/latest" "$ANDROID_SDK_ROOT/tools"
-          fi
-          echo "📂 Current SDK structure:"
-          ls -l $ANDROID_SDK_ROOT
-
-      - name: 🚀 APK বিল্ড করো
+      - name: 🚀 Build APK
         run: |
           source ~/.buildozer/venv/bin/activate
           export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
           export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
-          echo "🏗️ Starting Buildozer build..."
+          echo "🏗️ Building APK..."
           buildozer android debug
 
-      - name: 📤 APK আপলোড করো
+      - name: 📤 Upload built APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: built-apk
+          name: mykivyapp-apk
           path: bin/*.apk
