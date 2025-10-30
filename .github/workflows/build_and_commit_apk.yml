@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Android APK Build (Error-Free)
 
 on:
   push:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -18,38 +18,37 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install system dependencies
+      - name: Install Dependencies
         run: |
           sudo apt update
           sudo apt install -y git zip unzip openjdk-17-jdk python3-pip curl
+          pip install --upgrade pip
+          pip install buildozer cython
 
       - name: Install Android SDK
         run: |
-          mkdir -p "$HOME/android-sdk/cmdline-tools"
-          cd "$HOME/android-sdk/cmdline-tools"
-          curl -s https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -o sdk-tools.zip
-          unzip sdk-tools.zip
-          rm sdk-tools.zip
-          mkdir -p "$HOME/android-sdk/cmdline-tools/latest"
-          mv cmdline-tools/* "$HOME/android-sdk/cmdline-tools/latest/" || true
+          mkdir -p $HOME/android-sdk
+          cd $HOME/android-sdk
+          curl -s https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -o cmdtools.zip
+          unzip cmdtools.zip -d cmdline-tools
+          rm cmdtools.zip
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/cmdline-tools/* cmdline-tools/latest/ || true
           export ANDROID_HOME=$HOME/android-sdk
           export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
           yes | sdkmanager --licenses
           yes | sdkmanager "platform-tools" "platforms;android-34" "build-tools;36.0.0"
 
-      - name: Install Buildozer
+      - name: Set Environment Variables
         run: |
-          pip install --upgrade pip
-          pip install buildozer cython
+          echo "ANDROID_HOME=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH" >> $GITHUB_ENV
 
       - name: Build APK
-        env:
-          ANDROID_HOME: ${{ github.workspace }}/../android-sdk
         run: |
-          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
-          buildozer -v android debug
+          buildozer android debug
 
-      - name: Upload APK artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: MyApp-APK
